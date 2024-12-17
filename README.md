@@ -1,4 +1,5 @@
-### Energy Trading Analysis
+### Energy Trading Analysis ###
+
 Focus: Commodity Price Analysis and Trading Patterns
 
 # Data Sources:
