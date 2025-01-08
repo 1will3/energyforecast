@@ -1,80 +1,25 @@
-### Energy Trading Analysis ###
+Energy Futures Forecasting Project
+Project Overview
+This project develops a forecasting model for energy futures prices by combining market data, trading positions, and company fundamentals. Using advanced time series analysis (ARIMA/SARIMA) alongside market context metrics, the project aims to predict price movements and identify significant market patterns.
+Key Objectives
 
-Focus: Commodity Price Analysis and Trading Patterns
+Develop accurate price forecasting models for energy futures
+Integrate multiple data sources (ICE/CME, CFTC, SEC 10-K) for comprehensive analysis
+Create interactive visualizations for price predictions and market context
+Implement a complete data pipeline from collection to visualization
 
-# Data Sources:
+Technical Implementation
 
-- Yahoo Finance API for energy futures
-- EIA (Energy Information Administration) data
-- Public commodity pricing datasets
+Data Collection: Gathering futures prices, trading positions, and company data from ICE/CME, CFTC, and SEC sources
+Database Setup: Implementing SQL database and Databricks processing environment
+Data Processing: Cleaning, merging, and preparing data for analysis
+Forecasting Model: Developing ARIMA/SARIMA models with market context features
+Visualization: Creating interactive PowerBI dashboards for analysis presentation
 
-# Implementation:
+Tools & Technologies
 
-Data Pipeline:
-
-- SQL database for historical prices
-- Databricks for processing
-- Statistical analysis in Python/R
-- Trading pattern identification
-
-Analysis:
-
-- Price trend analysis
-- Volatility patterns
-- Basic trading signals
-- Statistical arbitrage opportunities
-- Correlation analysis between commodities
-
-Visualization (Shiny):
-
-- Interactive price charts
-- Trading volume analysis
-- Price correlation heatmaps
-- Basic technical indicators
-- Market trend analysis
-
-Quick Win Features:
-
-- Focus on one energy commodity initially
-- Use basic technical indicators
-- Implement simple statistical tests
-- Create clean, focused visualizations
-
-# General Tips for Quick Implementation:
-
-Scope Management:
-
-- Start with MVP (Minimum Viable Product)
-- Add features incrementally
-- Focus on core functionality first
-
-Technical Setup:
-
-- Use Databricks Community Edition
-- Leverage built-in Spark SQL capabilities
-- Use pre-built visualization components
-
-
-Development Approach:
-
-- Build basic pipeline first
-- Add statistical analysis
-- Implement visualizations last
-- Document as you go
-
-Time-Saving Strategies:
-
-- Use sample datasets initially
-- Implement basic versions of analyses
-- Focus on clean, working code over optimization
-- Use standard library functions where possible
-
-
-# These projects should:
-
-Demonstrate SQL, Databricks, and visualization skills
-Show statistical analysis capabilities
-Be completable in a reasonable timeframe
-Be extendable for future enhancement
-Be relevant to real-world applications
+Python (Time Series Analysis)
+SQL & Databricks (Data Pipeline)
+PowerBI (Visualization)
+Data Sources: ICE/CME, CFTC, SEC EDGAR
 
