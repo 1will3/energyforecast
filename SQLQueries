@@ -1,0 +1,23 @@
+## pgAdmin4 used with PostGreSQL 17
+
+### Creating Schema for ...
+CREATE SCHEMA raw_data;
+CREATE SCHEMA clean_data;
+CREATE SCHEMA analysis;
+
+
+###Creating Yahoo Finance table
+
+DROP TABLE IF EXISTS raw_data.futures_prices;
+
+CREATE TABLE raw_data.futures_prices (
+    trade_date DATE,      -- for the dates like 1/4/2021
+    price DECIMAL(10,2),
+    close DECIMAL(10,2),
+    high DECIMAL(10,2),
+    low DECIMAL(10,2),
+    open DECIMAL(10,2),
+    volume INT,
+    product VARCHAR(20)
+);
+
