@@ -1,0 +1,76 @@
+CREATE SCHEMA raw_data;
+CREATE SCHEMA clean_data;
+CREATE SCHEMA analysis;
+
+-----------------------------------------
+
+-- Futures prices table
+CREATE TABLE raw_data.futures_prices (
+    trade_date DATE,
+    closing_price DECIMAL(10,2),
+    high DECIMAL(10,2),
+    low DECIMAL(10,2),
+    open DECIMAL(10,2),
+    volume INT,
+    product VARCHAR(20)
+);
+
+-- Storage tables
+CREATE TABLE raw_data.petroleum_storage (
+    report_date DATE,
+    commercial_stocks BIGINT
+);
+
+CREATE TABLE raw_data.natural_gas_storage (
+    report_date DATE,
+    total_lower_48 BIGINT
+);
+
+-- Currency staging and final tables
+CREATE TABLE raw_data.currency_rates_staging (
+    date DATE,
+    close DECIMAL(10,4),
+    high DECIMAL(10,4),
+    low DECIMAL(10,4),
+    open DECIMAL(10,4),
+    volume BIGINT
+);
+
+CREATE TABLE raw_data.currency_rates (
+    date DATE,
+    currency VARCHAR(10),
+    close DECIMAL(10,4),
+    high DECIMAL(10,4),
+    low DECIMAL(10,4),
+    open DECIMAL(10,4),
+    volume BIGINT
+);
+
+-----------------------------------------------------
+
+-- For each currency:
+INSERT INTO raw_data.currency_rates (date, currency, close, high, low, open, volume)
+SELECT 
+    date,
+    '[CURRENCY]' as currency,
+    close,
+    high,
+    low,
+    open,
+    volume
+FROM raw_data.currency_rates_staging;
+
+TRUNCATE TABLE raw_data.currency_rates_staging;
+
+-----------------------------------------------------
+-- Currency data quality
+SELECT 
+    currency,
+    COUNT(*) as total_rows,
+    COUNT(*) FILTER (WHERE close IS NULL) as null_close,
+    COUNT(*) FILTER (WHERE high IS NULL) as null_high,
+    COUNT(*) FILTER (WHERE low IS NULL) as null_low,
+    COUNT(*) FILTER (WHERE open IS NULL) as null_open,
+    COUNT(*) FILTER (WHERE volume IS NULL) as null_volume
+FROM raw_data.currency_rates
+GROUP BY currency;
