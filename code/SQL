@@ -1,10 +1,11 @@
+# Create Schema for data processing
 CREATE SCHEMA raw_data;
 CREATE SCHEMA clean_data;
 CREATE SCHEMA analysis;
 
 -----------------------------------------
 
--- Futures prices table
+# Energy Futures prices table
 CREATE TABLE raw_data.futures_prices (
     trade_date DATE,
     closing_price DECIMAL(10,2),
@@ -15,7 +16,7 @@ CREATE TABLE raw_data.futures_prices (
     product VARCHAR(20)
 );
 
--- Storage tables
+# Energy Storage tables
 CREATE TABLE raw_data.petroleum_storage (
     report_date DATE,
     commercial_stocks BIGINT
@@ -48,7 +49,7 @@ CREATE TABLE raw_data.currency_rates (
 
 -----------------------------------------------------
 
--- For each currency:
+# Uploading and cleaing currency data
 INSERT INTO raw_data.currency_rates (date, currency, close, high, low, open, volume)
 SELECT 
     date,
@@ -63,7 +64,7 @@ FROM raw_data.currency_rates_staging;
 TRUNCATE TABLE raw_data.currency_rates_staging;
 
 -----------------------------------------------------
--- Currency data quality
+# Pull up and verfiy currency upload quality
 SELECT 
     currency,
     COUNT(*) as total_rows,
