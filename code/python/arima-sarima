@@ -1,0 +1,39 @@
+import pandas as pd
+import numpy as np
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.stattools import adfuller
+from pmdarima import auto_arima
+
+# Load and prepare data
+# df = your time series data
+# Ensure data is sorted by date and set as index
+df = df.sort_index()
+
+# Test for stationarity
+def test_stationarity(series):
+    result = adfuller(series)
+    print('ADF Statistic:', result[0])
+    print('p-value:', result[1])
+
+# Find best SARIMA parameters automatically
+model = auto_arima(df['price'], 
+                  seasonal=True, 
+                  m=12,  # 12 for monthly seasonality
+                  d=1,   # differencing
+                  D=1,   # seasonal differencing
+                  start_p=0, start_q=0,
+                  max_p=5, max_q=5,
+                  trace=True)
+
+# Fit SARIMA model with best parameters
+sarima_model = SARIMAX(df['price'],
+                      order=(p,d,q),          # from auto_arima
+                      seasonal_order=(P,D,Q,s) # from auto_arima
+                     ).fit()
+
+# Make forecasts
+forecast = sarima_model.forecast(steps=30)  # 30 days ahead
+forecast_ci = sarima_model.get_forecast(steps=30).conf_int()
+
+# Model diagnostics
+print(sarima_model.summary())
