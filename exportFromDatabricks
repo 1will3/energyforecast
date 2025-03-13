@@ -1,0 +1,71 @@
+# Export all data for PowerBI
+
+# 1. Export forecasts 
+combined_forecast.to_csv("/tmp/energy_forecasts.csv", index=False)
+display(combined_forecast)
+
+# 2. Export full time series data
+crude_full_export = crude_full.reset_index()
+gas_full_export = gas_full.reset_index()
+
+crude_full_export.to_csv("/tmp/crude_oil_full.csv", index=False)
+gas_full_export.to_csv("/tmp/natural_gas_full.csv", index=False)
+
+display(crude_full_export)
+display(gas_full_export)
+
+# 3. Export model statistics
+model_stats = pd.DataFrame({
+    'Product': ['Crude Oil', 'Natural Gas'],
+    'RMSE': [
+        np.sqrt(mean_squared_error(crude_forecast['actual'], crude_forecast['forecast'])),
+        np.sqrt(mean_squared_error(gas_forecast['actual'], gas_forecast['forecast']))
+    ],
+    'MAE': [
+        mean_absolute_error(crude_forecast['actual'], crude_forecast['forecast']),
+        mean_absolute_error(gas_forecast['actual'], gas_forecast['forecast'])
+    ],
+    'Currency_Impact': [
+        crude_model.params[0],  # DXY for crude
+        gas_model.params[0]     # DXY for gas
+    ],
+    'Storage_Impact': [
+        crude_model.params[1],  # oil_storage
+        gas_model.params[1]     # gas_storage
+    ]
+})
+
+model_stats.to_csv("/tmp/model_statistics.csv", index=False)
+display(model_stats)
+
+# 4. Export correlation data
+corr_data = []
+
+# Crude oil correlations
+crude_corr = crude_full[['energy_price', 'DXY', 'oil_storage']].corr()
+for var in ['DXY', 'oil_storage']:
+    corr_data.append({
+        'Product': 'Crude Oil',
+        'Variable': var,
+        'Correlation': crude_corr.loc['energy_price', var]
+    })
+
+# Natural gas correlations
+gas_corr = gas_full[['energy_price', 'DXY', 'gas_storage']].corr()
+for var in ['DXY', 'gas_storage']:
+    corr_data.append({
+        'Product': 'Natural Gas',
+        'Variable': var,
+        'Correlation': gas_corr.loc['energy_price', var]
+    })
+
+corr_df = pd.DataFrame(corr_data)
+corr_df.to_csv("/tmp/correlations.csv", index=False)
+display(corr_df)
+
+print("\nAll data exported for PowerBI:")
+print("1. energy_forecasts.csv - Forecast results")
+print("2. crude_oil_full.csv - Complete crude oil time series")
+print("3. natural_gas_full.csv - Complete natural gas time series")
+print("4. model_statistics.csv - Model performance metrics")
+print("5. correlations.csv - Correlation data")
