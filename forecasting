@@ -1,0 +1,245 @@
+# Complete Energy Futures Analysis with ARIMA/SARIMA
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+from sklearn.metrics import mean_squared_error, mean_absolute_error
+import warnings
+warnings.filterwarnings('ignore')
+
+# === DATA PREPARATION ===
+# Read data
+daily_df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("dbfs:/FileStore/shared_uploads/whmatthews3@gmail.com/daily_prices_currencies.csv")
+
+weekly_df = spark.read.format("csv") \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .load("dbfs:/FileStore/shared_uploads/whmatthews3@gmail.com/weekly_fundamentals.csv")
+
+# Filter products and convert to pandas
+crude_oil_df = daily_df.filter(daily_df.product == "Crude Oil").toPandas()
+natural_gas_df = daily_df.filter(daily_df.product == "Natural Gas").toPandas()
+weekly_pd = weekly_df.toPandas()
+
+# Set date indices
+crude_oil_df.set_index('trade_date', inplace=True)
+natural_gas_df.set_index('trade_date', inplace=True)
+weekly_pd.set_index('report_date', inplace=True)
+
+# Create time series dataframes for both products
+def create_ts_df(product_df):
+    # Reshape to have one row per date with currency columns
+    pivot = product_df.pivot_table(
+        index=product_df.index,
+        columns='currency',
+        values='currency_value'
+    ).reset_index()
+    
+    # Merge with unique price data
+    prices = product_df[['energy_price', 'energy_volume']].reset_index() \
+        .drop_duplicates(subset=['trade_date']).set_index('trade_date')
+    
+    # Combine
+    ts_df = pd.merge(
+        prices,
+        pivot,
+        left_index=True,
+        right_on='trade_date'
+    ).set_index('trade_date')
+    
+    return ts_df
+
+# Create time series dataframes
+crude_ts = create_ts_df(crude_oil_df)
+gas_ts = create_ts_df(natural_gas_df)
+
+# Convert weekly to daily and merge
+weekly_daily = weekly_pd.asfreq('D').ffill()
+
+# Merge with prices
+crude_full = pd.merge(
+    crude_ts,
+    weekly_daily[['oil_storage']],
+    left_index=True,
+    right_index=True,
+    how='left'
+).fillna(method='ffill')
+
+gas_full = pd.merge(
+    gas_ts,
+    weekly_daily[['gas_storage']],
+    left_index=True,
+    right_index=True,
+    how='left'
+).fillna(method='ffill')
+
+print("Data preparation complete:")
+print(f"Crude Oil data shape: {crude_full.shape}")
+print(f"Natural Gas data shape: {gas_full.shape}")
+
+# === TIME SERIES ANALYSIS ===
+def analyze_product(data, product_name, target_var, exog_vars, storage_var):
+    print(f"\n{'='*50}")
+    print(f"ANALYSIS FOR {product_name.upper()}")
+    print(f"{'='*50}")
+    
+    # Test for stationarity
+    result = adfuller(data[target_var].dropna())
+    print(f'Stationarity Test for {product_name}:')
+    print(f'ADF Statistic: {result[0]:.4f}')
+    print(f'p-value: {result[1]:.4f}')
+    print('Stationary' if result[1] < 0.05 else 'Non-stationary')
+    
+    # Plot time series
+    plt.figure(figsize=(12, 6))
+    plt.plot(data[target_var])
+    plt.title(f'{product_name} Price (2021-2024)')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.show()
+    
+    # Split training/testing
+    train_size = int(len(data) * 0.8)
+    train = data.iloc[:train_size]
+    test = data.iloc[train_size:]
+    
+    print(f"Training data: {train.index.min()} to {train.index.max()}")
+    print(f"Testing data: {test.index.min()} to {test.index.max()}")
+    
+    # Prepare exogenous variables
+    train_exog = train[exog_vars]
+    test_exog = test[exog_vars]
+    
+    # Fit SARIMA model
+    model = SARIMAX(train[target_var],
+                   exog=train_exog,
+                   order=(0,1,0),
+                   seasonal_order=(0,0,2,5))
+    
+    model_fit = model.fit(disp=False)
+    print("\nModel Summary:")
+    print(model_fit.summary().tables[1])
+    
+    # Make forecasts
+    steps = len(test)
+    forecast = model_fit.forecast(steps=steps, exog=test_exog)
+    
+    # Calculate metrics
+    rmse = np.sqrt(mean_squared_error(test[target_var], forecast))
+    mae = mean_absolute_error(test[target_var], forecast)
+    mape = np.mean(np.abs((test[target_var] - forecast) / test[target_var])) * 100
+    
+    print("\nForecast Performance:")
+    print(f"RMSE: {rmse:.2f}")
+    print(f"MAE: {mae:.2f}")
+    print(f"MAPE: {mape:.2f}%")
+    
+    # Plot results
+    plt.figure(figsize=(12, 6))
+    plt.plot(train.index, train[target_var], label='Training Data')
+    plt.plot(test.index, test[target_var], label='Actual')
+    plt.plot(test.index, forecast, label='Forecast', color='red')
+    plt.title(f'{product_name} Price Forecast with Currency and Storage Data')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.show()
+    
+    # Currency and storage impact
+    print("\nVariable Influence Analysis:")
+    for var, coef in zip(exog_vars, model_fit.params[:len(exog_vars)]):
+        print(f"{var}: {coef:.4f} (p-value: {model_fit.pvalues[var]:.4f})")
+        
+    # Correlation analysis
+    correlations = data[[target_var] + exog_vars].corr()[target_var].drop(target_var)
+    print("\nCorrelations with price:")
+    print(correlations)
+    
+    # Create forecast data for PowerBI
+    forecast_df = pd.DataFrame({
+        'date': test.index,
+        'actual': test[target_var].values,
+        'forecast': forecast,
+        'product': product_name
+    })
+    
+    return model_fit, forecast_df
+
+# Run analysis for both products
+crude_model, crude_forecast = analyze_product(
+    crude_full, 
+    "Crude Oil", 
+    "energy_price", 
+    ['DXY', 'oil_storage'], 
+    'oil_storage'
+)
+
+gas_model, gas_forecast = analyze_product(
+    gas_full, 
+    "Natural Gas", 
+    "energy_price", 
+    ['DXY', 'gas_storage'], 
+    'gas_storage'
+)
+
+# Combine forecasts for PowerBI
+combined_forecast = pd.concat([crude_forecast, gas_forecast])
+
+# Create additional visualizations
+# 1. Price vs. Dollar Index
+plt.figure(figsize=(14, 7))
+
+# Crude Oil subplot
+plt.subplot(1, 2, 1)
+plt.scatter(crude_full['DXY'], crude_full['energy_price'], alpha=0.5)
+plt.title('Crude Oil Price vs. US Dollar Index')
+plt.xlabel('Dollar Index (DXY)')
+plt.ylabel('Crude Oil Price')
+z = np.polyfit(crude_full['DXY'], crude_full['energy_price'], 1)
+p = np.poly1d(z)
+plt.plot(crude_full['DXY'], p(crude_full['DXY']), "r--")
+
+# Natural Gas subplot
+plt.subplot(1, 2, 2)
+plt.scatter(gas_full['DXY'], gas_full['energy_price'], alpha=0.5)
+plt.title('Natural Gas Price vs. US Dollar Index')
+plt.xlabel('Dollar Index (DXY)')
+plt.ylabel('Natural Gas Price')
+z = np.polyfit(gas_full['DXY'], gas_full['energy_price'], 1)
+p = np.poly1d(z)
+plt.plot(gas_full['DXY'], p(gas_full['DXY']), "r--")
+
+plt.tight_layout()
+plt.show()
+
+# 2. Price vs. Storage Levels
+plt.figure(figsize=(14, 7))
+
+# Crude Oil subplot
+plt.subplot(1, 2, 1)
+plt.scatter(crude_full['oil_storage'], crude_full['energy_price'], alpha=0.5)
+plt.title('Crude Oil Price vs. Storage Levels')
+plt.xlabel('Oil Storage (Thousand Barrels)')
+plt.ylabel('Crude Oil Price')
+z = np.polyfit(crude_full['oil_storage'], crude_full['energy_price'], 1)
+p = np.poly1d(z)
+plt.plot(crude_full['oil_storage'], p(crude_full['oil_storage']), "r--")
+
+# Natural Gas subplot
+plt.subplot(1, 2, 2)
+plt.scatter(gas_full['gas_storage'], gas_full['energy_price'], alpha=0.5)
+plt.title('Natural Gas Price vs. Storage Levels')
+plt.xlabel('Gas Storage (BCF)')
+plt.ylabel('Natural Gas Price')
+z = np.polyfit(gas_full['gas_storage'], gas_full['energy_price'], 1)
+p = np.poly1d(z)
+plt.plot(gas_full['gas_storage'], p(gas_full['gas_storage']), "r--")
+
+plt.tight_layout()
+plt.show()
+
+print("\nAnalysis complete!")
