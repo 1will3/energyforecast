@@ -1,0 +1,5 @@
+Product,Variable,Correlation
+Crude Oil,DXY,0.42523006174417954
+Crude Oil,oil_storage,-0.5665944584362601
+Natural Gas,DXY,0.1787115845665482
+Natural Gas,gas_storage,-0.1252366143691692
